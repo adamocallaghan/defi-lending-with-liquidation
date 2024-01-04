@@ -128,7 +128,6 @@ contract TokenLending {
         // 1111 * 1e18 = 1111000000000000000000 (aka 1111e18)
         // 1111000000000000000000 / 1000 = 1111000000000000000 (aka 1111e15, aka 1.111 ETH)
         uint256 ethToRefund = (amountToRepay * 1e18) / 1000; // 1111000000000000000
-
         // transfer ETH collateral back to borrower
         payable(msg.sender).transfer(ethToRefund);
 
@@ -142,7 +141,7 @@ contract TokenLending {
     }
 
     function liquidate(address borrower, uint256 tokenAmountToRepay) external payable {
-        // check that borrower has a bad LTV ratio (i.e. tokens borrowed exceed acceptable levels compared to ETH collaeral deposited)
+        // check that borrower has a bad LTV ratio (i.e. tokens borrowed exceed acceptable levels compared to ETH collateral deposited)
         // tokenBorrowedBalances[borrower] - will be in standard magnitude, e.g. 5000
         uint256 tokensCurrentlyBorrowed = tokenBorrowedBalances[borrower];
 

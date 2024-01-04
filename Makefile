@@ -8,7 +8,7 @@ deploy-token:
 deploy-lending:
 	forge create src/TokenLending.sol:TokenLending --private-key $(BOB_PK) --constructor-args $(TOKEN_CONTRACT_ADDRESS)
 
-# === APPROVE, DESPOSIT & WTIHDRAW TOKENS ===
+# === APPROVE, DEPOSIT & WTIHDRAW TOKENS ===
 
 approve-tokens-to-lending:
 	cast send $(TOKEN_CONTRACT_ADDRESS) "approve(address,uint)" $(LENDING_CONTRACT_ADDRESS) 999999 --private-key $(ALICE_PK)
