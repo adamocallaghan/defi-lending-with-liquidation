@@ -145,11 +145,13 @@ contract TokenLending {
         // check that borrower has a bad LTV ratio (i.e. tokens borrowed exceed acceptable levels compared to ETH collaeral deposited)
         // tokenBorrowedBalances[borrower] - will be in standard magnitude, e.g. 5000
         uint256 tokensCurrentlyBorrowed = tokenBorrowedBalances[borrower];
+
         require(
             tokenAmountToRepay <= tokensCurrentlyBorrowed,
             "You are trying to repay beyond what was issued for the loan you are trying to liquidate"
         );
-        // ethCollateralBalances[borrower] - will be in WEI - so 5 ETH = 5000000000000000000
+
+        // ethCollateralBalances[borrower] - will be in WEI, so 5 ETH = 5000000000000000000
         uint256 ethCollateralInWei = ethCollateralBalances[borrower];
         // OK! e.g. borrowerHealthFactor = 5000000000000000000 / 5000 (1000000000000000, exactly the same as MIN_HEALTH_FACTOR)
         // OK! e.g. borrowerHealthFactor = 5000000000000000000 / 4000 (1250000000000000, 25% above MIN_HEALTH_FACTOR)
