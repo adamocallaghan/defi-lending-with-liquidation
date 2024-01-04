@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
+import "forge-std/console2.sol";
 
 contract TokenLending {
     // === STATE VARIABLES ===
@@ -12,7 +13,7 @@ contract TokenLending {
     mapping(address => uint256) public tokenBorrowedBalances;
     mapping(address => uint256) public ethCollateralBalances;
     uint256 public totalTokensInContract;
-    uint256 public MIN_HEALTH_FACTOR = 1000 * 1e12;
+    uint256 public MIN_HEALTH_FACTOR = 1e15;
 
     // === EVENTS ===
     event UserHasDespositedTokens();
@@ -76,8 +77,11 @@ contract TokenLending {
 
         // user can only borrow as much as they have deposited as collateral
         // require(tokenCollateralBalances[msg.sender] >= amount, "You can't borrow more than you have as collateral");
-        uint256 amountEthCollateral = msg.value; // 5 ETH = 5 000 000 000 000 000 000 WEI
-        uint256 maxTokenBorrowAmount = _calculateTokenAmountUsingOracle(amountEthCollateral);
+        console2.log("msg.value is: ", msg.value);
+        uint256 amountEthCollateralInWei = msg.value; // will be in WEI, so 5 ETH = 5 000 000 000 000 000 000 WEI
+        uint256 maxTokenBorrowAmount = _calculateTokenAmountUsingOracle(amountEthCollateralInWei);
+        console2.log("maxTokenBorrowAmount: ", maxTokenBorrowAmount);
+
         require(amount < maxTokenBorrowAmount, "Borrow amount requested too high");
 
         // update eth balances
@@ -94,15 +98,13 @@ contract TokenLending {
         emit UserHasBorrowTokens();
     }
 
-    function _calculateTokenAmountUsingOracle(uint256 amountEthCollateral) internal returns (uint256) {
-        // NEXT CALC IS...
-        // 5000000000000000000 * 1000 = 5000000000000000000000
-        // 5000000000000000000000 / 1e18 = 5000 (max tokens to borrow)
-        uint256 maxTokens = amountEthCollateral * 1000;
-        uint256 maxTokenBorrowAmount = maxTokens / 1e18;
-
-        // RATIO OF TOKENS TO ETH IN THE REAL WORLD WOULD BE DYNAMIC
-        // IN ORDER TO CALCULATE THE AMOUNT OF OUR TOKEN PER ETH WE'D NEED TO CALL AN ORACLE
+    function _calculateTokenAmountUsingOracle(uint256 amountEthCollateralInWei) internal returns (uint256) {
+        // amountInEth = 5000000000000000000 / 1e18 = 5
+        uint256 amountInEth = amountEthCollateralInWei / 1e18;
+        // maxTokenBorrowAmount = 5 * 1000 = 50000
+        uint256 maxTokenBorrowAmount = amountInEth * 1000;
+        // @notice: RATIO OF TOKENS TO ETH IN THE REAL WORLD WOULD BE DYNAMIC
+        // @notice: IN ORDER TO CALCULATE THE AMOUNT OF OUR TOKEN PER ETH WE'D NEED TO CALL AN ORACLE
         return maxTokenBorrowAmount;
     }
 
@@ -115,6 +117,8 @@ contract TokenLending {
         require(tokenBorrowedBalances[msg.sender] > amountToRepay, "You do not have an outstanding loan");
 
         // transfer tokens to contract
+        console2.log("== REPAY: TOKEN TRANSFER IN ===");
+        console2.log("amountToRepay: ", amountToRepay);
         token.transferFrom(msg.sender, address(this), amountToRepay);
 
         // update balances
@@ -122,12 +126,21 @@ contract TokenLending {
         totalTokensInContract += amountToRepay;
 
         // calculate amount of ETH to transfer back to borrower based on the tokens repaid
-        uint256 ethToRefund = amountToRepay / 1000;
+        uint256 ethToRefund = (amountToRepay * 1e18) / 1000; // 1111000000000000000
+        console2.log("ethToRefund: ", ethToRefund);
         // transfer ETH collateral back to borrower
+        console2.log("== REPAY: JUST BEFORE TRANSFER ETH OUT ===");
+        // (bool sent,) = payable(msg.sender).call{value: ethToRefund}("");
+        // require(sent, "Failed to send ether to loan repayer");
         payable(msg.sender).transfer(ethToRefund);
 
         // emit event
         emit UserHasRepaidLoan();
+    }
+
+    function nukeHealthFactor(address borrower) external {
+        // add 987000 tokens to the borrower's borrowed amount
+        tokenBorrowedBalances[borrower] += 987000;
     }
 
     function liquidate(address borrower, uint256 tokenAmountToRepay) external payable {
@@ -150,18 +163,18 @@ contract TokenLending {
         // transfer tokens from liquidator into the contract
         token.transfer(msg.sender, tokenAmountToRepay);
 
-        // update token balances (of borrower) - i.e. loan repaid to a certain level
+        // update token balances (of borrower) - i.e. loan repaid to a certain level (liquidator has paid off some of their loan)
         tokenBorrowedBalances[borrower] -= tokenAmountToRepay;
 
-        // calculate amount of ETH to send to the liquidator - i.e. the value of their tokens repaid in ETH
-        uint256 oneEth = 1e18;
-        uint256 tokensPerEth = 1000;
-        uint256 ethAmount = tokenAmountToRepay / tokensPerEth;
-        uint256 ethAmountInWei = ethAmount * 1e18;
+        // calculate amount of ETH to send to the liquidator - i.e. the value (in ETH) of the tokens they've repaid
+        // uint256 oneEth = 1e18;
+        uint256 tokensPerEth = 1000; // this line is essentially our "oracle" for this part
+        uint256 ethAmount = tokenAmountToRepay / tokensPerEth; // e.g. 5000 tokens / 1000 = 5 ETH
+        uint256 ethAmountInWei = ethAmount * 1e18; // 5 * 1000000000000000000 = 5000000000000000000 (aka 5 ETH measured in WEI)
 
         // calculate their BONUS (10%) in ETH that they will get for liquidating the user and maintaining the health of the protocol
-        uint256 bonus = ethAmountInWei / 10;
-        uint256 totalEthToLiquidator = ethAmountInWei + bonus;
+        uint256 bonus = ethAmountInWei / 10; // e.g. 5000000000000000000 / 10 = 500000000000000000
+        uint256 totalEthToLiquidator = ethAmountInWei + bonus; // 5000000000000000000 + 500000000000000000 (or 5e18 + 5e17) = 5500000000000000000
 
         // transfer ETH to liquidator
         payable(msg.sender).transfer(totalEthToLiquidator);
