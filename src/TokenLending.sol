@@ -79,7 +79,7 @@ contract TokenLending {
         // require(tokenCollateralBalances[msg.sender] >= amount, "You can't borrow more than you have as collateral");
         console2.log("msg.value is: ", msg.value);
         uint256 amountEthCollateralInWei = msg.value; // will be in WEI, so 5 ETH = 5 000 000 000 000 000 000 WEI
-        uint256 maxTokenBorrowAmount = _calculateTokenAmountUsingOracle(amountEthCollateralInWei);
+        uint256 maxTokenBorrowAmount = _calculateMaxTokenBorrowAmount(amountEthCollateralInWei);
         console2.log("maxTokenBorrowAmount: ", maxTokenBorrowAmount);
 
         require(amount < maxTokenBorrowAmount, "Borrow amount requested too high");
@@ -98,7 +98,7 @@ contract TokenLending {
         emit UserHasBorrowTokens();
     }
 
-    function _calculateTokenAmountUsingOracle(uint256 amountEthCollateralInWei) internal returns (uint256) {
+    function _calculateMaxTokenBorrowAmount(uint256 amountEthCollateralInWei) internal returns (uint256) {
         // amountInEth = 5000000000000000000 / 1e18 = 5
         uint256 amountInEth = amountEthCollateralInWei / 1e18;
         // maxTokenBorrowAmount = 5 * 1000 = 50000

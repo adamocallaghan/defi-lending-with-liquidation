@@ -1,66 +1,25 @@
-## Foundry
+## DeFi Lending: Collateralised Lending with Liquidations
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+**LEVEL UP, SEASON 1**
+**Level 3: Collateralised Lending Contract with Liquidation**
 
-Foundry consists of:
+Project contains...
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+CONTRACTS:
 
-## Documentation
+- **MyToken.sol**: a basic ERC20 token to be deposited into and borrowed from the Lending contract
+- **TokenLending.sol**: the main lending and borrowing contract
 
-https://book.getfoundry.sh/
+FUNCTIONS
 
-## Usage
+- **deposit**: deposit ERC20 tokens (i.e. deployed instance of MyToken) into the contract
+- **withdraw**: withdraw ERC20 tokens
+- **bororwTokensWithCollateral**: deposit ETH (via msg.value) as collateral and borrow ERC20 tokens from the contract
+- **\_calculateMaxTokenBorrowAmount**: an internal function that stands in for an oracle call
+- **repay**: repay ERC20 loan and retrieve ETH collateral
+- **nukeHealthFactor**: this function reduces the user's health factor so they can be liquidated
+- **liquidate**: repay the borrower's loan, liquidate their ETH collateral + a 10% bonus for doing so
 
-### Build
+OTHER
 
-```shell
-$ forge build
-```
-
-### Test
-
-```shell
-$ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+- **Makefile**: contains forge and cast commands for each step of the contract (e.g. run "make deploy-token" in your shell)
