@@ -1,6 +1,7 @@
 ## DeFi Lending: Collateralised Lending with Liquidations
 
 **LEVEL UP, SEASON 1**
+
 **Level 3: Collateralised Lending Contract with Liquidation**
 
 Project contains...
