@@ -75,13 +75,11 @@ contract TokenLending {
         // check amount is greater than zero
         require(amount > 0, "Please specify an amount to borrow");
 
-        // user can only borrow as much as they have deposited as collateral
-        // require(tokenCollateralBalances[msg.sender] >= amount, "You can't borrow more than you have as collateral");
-        console2.log("msg.value is: ", msg.value);
+        // calculate the max tokens they can borrow based on the ETH transfered into the contract
         uint256 amountEthCollateralInWei = msg.value; // will be in WEI, so 5 ETH = 5 000 000 000 000 000 000 WEI
         uint256 maxTokenBorrowAmount = _calculateMaxTokenBorrowAmount(amountEthCollateralInWei);
-        console2.log("maxTokenBorrowAmount: ", maxTokenBorrowAmount);
 
+        // can't borrow more than the max
         require(amount < maxTokenBorrowAmount, "Borrow amount requested too high");
 
         // update eth balances
@@ -116,22 +114,22 @@ contract TokenLending {
         // check that the user has an outstanding loan
         require(tokenBorrowedBalances[msg.sender] > amountToRepay, "You do not have an outstanding loan");
 
+        // @notice: As with depositing tokens...
+        /// ...the EOA should call approve on the token contract to allow lending contract to spend/transfer it's tokens
+
         // transfer tokens to contract
-        console2.log("== REPAY: TOKEN TRANSFER IN ===");
-        console2.log("amountToRepay: ", amountToRepay);
         token.transferFrom(msg.sender, address(this), amountToRepay);
 
         // update balances
         tokenBorrowedBalances[msg.sender] -= amountToRepay;
         totalTokensInContract += amountToRepay;
 
-        // calculate amount of ETH to transfer back to borrower based on the tokens repaid
+        // calculate amount of ETH to transfer back to borrower based on the tokens repaid...
+        // 1111 * 1e18 = 1111000000000000000000 (aka 1111e18)
+        // 1111000000000000000000 / 1000 = 1111000000000000000 (aka 1111e15, aka 1.111 ETH)
         uint256 ethToRefund = (amountToRepay * 1e18) / 1000; // 1111000000000000000
-        console2.log("ethToRefund: ", ethToRefund);
+
         // transfer ETH collateral back to borrower
-        console2.log("== REPAY: JUST BEFORE TRANSFER ETH OUT ===");
-        // (bool sent,) = payable(msg.sender).call{value: ethToRefund}("");
-        // require(sent, "Failed to send ether to loan repayer");
         payable(msg.sender).transfer(ethToRefund);
 
         // emit event
