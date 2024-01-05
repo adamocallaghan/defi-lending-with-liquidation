@@ -25,7 +25,7 @@ withdraw-tokens:
 # === BORROW TOKENS WITH COLLATERAL ===
 
 # We will ask to borrow 4000 tokens using 5 ETH as collateral (1 ETH = 1000 tokens hardcoded in our contract)
-# Our health factor after this should be 0.8 (i.e. we've borrowed 80%/4000 tokens of the max of 5000 that we could)
+# Our health factor after this should be 1.25
 borrow-tokens-with-eth:
 	cast send $(LENDING_CONTRACT_ADDRESS) "bororwTokensWithCollateral(uint)" 4000 --private-key $(BOB_PK) --value 5ether
 

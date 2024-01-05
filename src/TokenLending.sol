@@ -4,16 +4,29 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "forge-std/console2.sol";
 
+interface AggregatorV3Interface {
+    function latestAnswer() external view returns (int256);
+}
+
 contract TokenLending {
     // === STATE VARIABLES ===
     IERC20 public token;
+
+    // === ORACLE ADDRESS ===
+    /**
+     * Network: Eth Mainnnet
+     * Aggregator: ETH/USD
+     * Address: 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419
+     */
+    AggregatorV3Interface internal dataFeed = AggregatorV3Interface(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
 
     // === BALANCES ===
     mapping(address => uint256) public tokenCollateralBalances;
     mapping(address => uint256) public tokenBorrowedBalances;
     mapping(address => uint256) public ethCollateralBalances;
     uint256 public totalTokensInContract;
-    uint256 public MIN_HEALTH_FACTOR = 1e15;
+    uint256 public MIN_HEALTH_FACTOR = 1e18;
+    uint256 public PRECISION = 1e18;
 
     // === EVENTS ===
     event UserHasDespositedTokens();
@@ -30,7 +43,7 @@ contract TokenLending {
     // === DEPOSIT: deposit ERC20 tokens (that can then be borrowed by borrowers)
     function deposit(uint256 amount) public {
         // check amount is greater than zero
-        require(amount > 0, "Plesee deposit an amount greater than zero");
+        require(amount > 0, "Please deposit an amount greater than zero");
 
         // *** EOA should call approve on the token contract to allow lending contract to spend/transfer it's tokens ***
 
@@ -99,11 +112,18 @@ contract TokenLending {
     function _calculateMaxTokenBorrowAmount(uint256 amountEthCollateralInWei) internal returns (uint256) {
         // amountInEth = 5000000000000000000 / 1e18 = 5
         uint256 amountInEth = amountEthCollateralInWei / 1e18;
-        // maxTokenBorrowAmount = 5 * 1000 = 50000
-        uint256 maxTokenBorrowAmount = amountInEth * 1000;
-        // @notice: RATIO OF TOKENS TO ETH IN THE REAL WORLD WOULD BE DYNAMIC
-        // @notice: IN ORDER TO CALCULATE THE AMOUNT OF OUR TOKEN PER ETH WE'D NEED TO CALL AN ORACLE
+        uint256 ethPriceInUsd = uint256(_getChainlinkDataFeedLatestAnswer()); // returns the price in 4 digit magnitude
+        uint256 maxTokenBorrowAmount = amountInEth * ethPriceInUsd;
         return maxTokenBorrowAmount;
+    }
+
+    /**
+     * Returns the latest answer from Chainlink's ETH-USD feed
+     */
+    function _getChainlinkDataFeedLatestAnswer() internal view returns (int256) {
+        // latestAnswer returns 8 decinamls (e.g. if ETH is $2235, then answer would return 223500000000, or 2235e8)
+        int256 answer = dataFeed.latestAnswer();
+        return answer / 1e8; // e.g. if ETH is 223500000000 this will return 2235
     }
 
     // Repay Function: Construct a repayToken function for users to return borrowed tokens.
@@ -126,8 +146,12 @@ contract TokenLending {
 
         // calculate amount of ETH to transfer back to borrower based on the tokens repaid...
         // 1111 * 1e18 = 1111000000000000000000 (aka 1111e18)
-        // 1111000000000000000000 / 1000 = 1111000000000000000 (aka 1111e15, aka 1.111 ETH)
-        uint256 ethToRefund = (amountToRepay * 1e18) / 1000; // 1111000000000000000
+        // 1111000000000000000000 / 2235 = 497091722595078299 (aka 0.49 ETH)
+        // 1.111000000000000000
+        // 0.497091722595078299
+        //
+        uint256 ethPriceInUsd = uint256(_getChainlinkDataFeedLatestAnswer());
+        uint256 ethToRefund = (amountToRepay * 1e18) / ethPriceInUsd; // 1111000000000000000
         // transfer ETH collateral back to borrower
         payable(msg.sender).transfer(ethToRefund);
 
@@ -150,12 +174,7 @@ contract TokenLending {
             "You are trying to repay beyond what was issued for the loan you are trying to liquidate"
         );
 
-        // ethCollateralBalances[borrower] - will be in WEI, so 5 ETH = 5000000000000000000
-        uint256 ethCollateralInWei = ethCollateralBalances[borrower];
-        // OK! e.g. borrowerHealthFactor = 5000000000000000000 / 5000 (1000000000000000, exactly the same as MIN_HEALTH_FACTOR)
-        // OK! e.g. borrowerHealthFactor = 5000000000000000000 / 4000 (1250000000000000, 25% above MIN_HEALTH_FACTOR)
-        // LIQUIDATABLE! e.g. borrowerHealthFactor = 5000000000000000000 / 6000 (833333333333333, 16.66% under MIN_HEALTH_FACTOR)
-        uint256 borrowerHealthFactor = ethCollateralInWei / tokensCurrentlyBorrowed;
+        uint256 borrowerHealthFactor = _getBorrowerHealthFactor(borrower);
 
         require(borrowerHealthFactor < MIN_HEALTH_FACTOR, "User loan is not liquidatable");
 
@@ -166,10 +185,8 @@ contract TokenLending {
         tokenBorrowedBalances[borrower] -= tokenAmountToRepay;
 
         // calculate amount of ETH to send to the liquidator - i.e. the value (in ETH) of the tokens they've repaid
-        // uint256 oneEth = 1e18;
-        uint256 tokensPerEth = 1000; // this line is essentially our "oracle" for this part
-        uint256 ethAmount = tokenAmountToRepay / tokensPerEth; // e.g. 5000 tokens / 1000 = 5 ETH
-        uint256 ethAmountInWei = ethAmount * 1e18; // 5 * 1000000000000000000 = 5000000000000000000 (aka 5 ETH measured in WEI)
+        uint256 tokensPerEth = uint256(_getChainlinkDataFeedLatestAnswer());
+        uint256 ethAmountInWei = (tokenAmountToRepay * PRECISION) / (tokensPerEth);
 
         // calculate their BONUS (10%) in ETH that they will get for liquidating the user and maintaining the health of the protocol
         uint256 bonus = ethAmountInWei / 10; // e.g. 5000000000000000000 / 10 = 500000000000000000
@@ -177,5 +194,22 @@ contract TokenLending {
 
         // transfer ETH to liquidator
         payable(msg.sender).transfer(totalEthToLiquidator);
+    }
+
+    function _getBorrowerHealthFactor(address borrower) internal view returns (uint256) {
+        // get borrower's borrowed tokens amount
+        uint256 borrowed = tokenBorrowedBalances[borrower]; // e.g. 10,000 tokens
+        uint256 borrowedWithPrecision = borrowed * PRECISION; // i.e. 10,000-000-000-000-000-000-000
+
+        // get borower's ETH collateral amount
+        uint256 ethCollateralInWei = ethCollateralBalances[borrower]; // e.g. 5,000,000,000,000,000,000 WEI
+
+        // call oracle to get price of ETH in USD (our tokens are USD-pegged for ease of demonstration)
+        uint256 ethPriceInUsd = uint256(_getChainlinkDataFeedLatestAnswer()); // e.g. 2235
+        uint256 ethPriceInUsdWithPrecision = ethPriceInUsd * PRECISION; // i.e. 2,235-000-000-000-000-000-000
+
+        // calculate health factor
+        uint256 healthFactor = (ethCollateralInWei * ethPriceInUsdWithPrecision) / borrowedWithPrecision;
+        return healthFactor;
     }
 }
