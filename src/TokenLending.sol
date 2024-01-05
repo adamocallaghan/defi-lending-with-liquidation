@@ -177,6 +177,9 @@ contract TokenLending {
         uint256 borrowerHealthFactor = _getBorrowerHealthFactor(borrower);
 
         require(borrowerHealthFactor < MIN_HEALTH_FACTOR, "User loan is not liquidatable");
+        // MIN HEALTH FACTOR = 1.000000000000000000
+        // USER'S HEALTH FACT= 1.117500000000000000
+        // NEW HEALTH FACTOR = 0.111751117511175111
 
         // transfer tokens from liquidator into the contract
         token.transfer(msg.sender, tokenAmountToRepay);

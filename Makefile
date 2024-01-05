@@ -27,7 +27,7 @@ withdraw-tokens:
 # We will ask to borrow 4000 tokens using 5 ETH as collateral (1 ETH = 1000 tokens hardcoded in our contract)
 # Our health factor after this should be 1.25
 borrow-tokens-with-eth:
-	cast send $(LENDING_CONTRACT_ADDRESS) "bororwTokensWithCollateral(uint)" 4000 --private-key $(BOB_PK) --value 5ether
+	cast send $(LENDING_CONTRACT_ADDRESS) "bororwTokensWithCollateral(uint)" 4000 --private-key $(BOB_PK) --value 1ether
 # ==> FIX FUNCTION NAME: borrowTokensWithCollateral, not 'bor-orw'
 check-tokens-borrowed:
 	cast call $(LENDING_CONTRACT_ADDRESS) "tokenBorrowedBalances(address)(uint)" $(BOB_ADDRESS)
